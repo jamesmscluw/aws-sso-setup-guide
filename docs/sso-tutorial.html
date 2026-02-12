@@ -1,0 +1,804 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AWS SSO設定ガイド — Google Workspace × IAM Identity Center</title>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@300;400;500;700&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #0f1117;
+    --surface: #1a1d27;
+    --surface2: #22263a;
+    --border: #2e3350;
+    --accent: #4f8ef7;
+    --accent2: #7c6af5;
+    --orange: #f7894f;
+    --green: #4fbe96;
+    --text: #e2e6f3;
+    --text-muted: #7a82a8;
+    --text-dim: #4a5278;
+    --code-bg: #151820;
+    --radius: 10px;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Noto Sans JP', sans-serif;
+    font-size: 15px;
+    line-height: 1.8;
+  }
+
+  /* ── Header ── */
+  .site-header {
+    background: linear-gradient(135deg, #0d1428 0%, #12183a 50%, #0f1117 100%);
+    border-bottom: 1px solid var(--border);
+    padding: 48px 0 40px;
+    text-align: center;
+    position: relative;
+    overflow: hidden;
+  }
+  .site-header::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: radial-gradient(ellipse 60% 80% at 50% -10%, rgba(79,142,247,.15) 0%, transparent 70%);
+    pointer-events: none;
+  }
+  .site-header .badge {
+    display: inline-block;
+    background: rgba(79,142,247,.12);
+    border: 1px solid rgba(79,142,247,.3);
+    color: var(--accent);
+    font-size: 11px;
+    font-weight: 500;
+    letter-spacing: .1em;
+    text-transform: uppercase;
+    padding: 4px 14px;
+    border-radius: 20px;
+    margin-bottom: 16px;
+  }
+  .site-header h1 {
+    font-size: clamp(20px, 4vw, 32px);
+    font-weight: 700;
+    line-height: 1.3;
+    margin-bottom: 12px;
+  }
+  .site-header h1 span { color: var(--accent); }
+  .site-header .subtitle {
+    color: var(--text-muted);
+    font-size: 14px;
+    font-weight: 300;
+  }
+  .source-link {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    margin-top: 20px;
+    font-size: 12px;
+    color: var(--text-muted);
+    text-decoration: none;
+    border: 1px solid var(--border);
+    padding: 5px 12px;
+    border-radius: 20px;
+    transition: border-color .2s, color .2s;
+  }
+  .source-link:hover { color: var(--accent); border-color: var(--accent); }
+
+  /* ── Layout ── */
+  .layout {
+    display: flex;
+    max-width: 1200px;
+    margin: 0 auto;
+    gap: 32px;
+    padding: 40px 24px;
+  }
+
+  /* ── TOC Sidebar ── */
+  .toc {
+    width: 260px;
+    flex-shrink: 0;
+  }
+  .toc-inner {
+    position: sticky;
+    top: 24px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 20px;
+  }
+  .toc-title {
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: .1em;
+    text-transform: uppercase;
+    color: var(--text-muted);
+    margin-bottom: 14px;
+  }
+  .toc-part {
+    margin-bottom: 14px;
+  }
+  .toc-part-label {
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: .08em;
+    text-transform: uppercase;
+    padding: 3px 8px;
+    border-radius: 4px;
+    margin-bottom: 6px;
+    display: inline-block;
+  }
+  .toc-part-label.p1 { background: rgba(79,142,247,.15); color: var(--accent); }
+  .toc-part-label.p2 { background: rgba(124,106,245,.15); color: var(--accent2); }
+  .toc-part-label.p3 { background: rgba(79,190,150,.15); color: var(--green); }
+
+  .toc a {
+    display: block;
+    font-size: 12.5px;
+    color: var(--text-muted);
+    text-decoration: none;
+    padding: 3px 0 3px 10px;
+    border-left: 2px solid transparent;
+    transition: color .15s, border-color .15s;
+    line-height: 1.5;
+  }
+  .toc a:hover { color: var(--text); border-left-color: var(--accent); }
+
+  /* ── Main content ── */
+  .content { flex: 1; min-width: 0; }
+
+  /* Part banners */
+  .part-banner {
+    border-radius: var(--radius);
+    padding: 18px 24px;
+    margin-bottom: 32px;
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    border: 1px solid;
+  }
+  .part-banner.p1 { background: rgba(79,142,247,.07); border-color: rgba(79,142,247,.25); }
+  .part-banner.p2 { background: rgba(124,106,245,.07); border-color: rgba(124,106,245,.25); }
+  .part-banner.p3 { background: rgba(79,190,150,.07); border-color: rgba(79,190,150,.25); }
+
+  .part-num {
+    font-size: 28px;
+    font-weight: 700;
+    font-family: 'JetBrains Mono', monospace;
+    opacity: .5;
+  }
+  .p1 .part-num { color: var(--accent); }
+  .p2 .part-num { color: var(--accent2); }
+  .p3 .part-num { color: var(--green); }
+
+  .part-info h2 { font-size: 17px; font-weight: 700; margin-bottom: 2px; }
+  .part-info p { font-size: 12.5px; color: var(--text-muted); }
+
+  /* Sections */
+  .section {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    margin-bottom: 20px;
+    overflow: hidden;
+  }
+  .section-header {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    padding: 16px 20px;
+    border-bottom: 1px solid var(--border);
+    background: var(--surface2);
+  }
+  .step-num {
+    width: 32px;
+    height: 32px;
+    border-radius: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 13px;
+    font-weight: 700;
+    font-family: 'JetBrains Mono', monospace;
+    flex-shrink: 0;
+  }
+  .p1 .step-num { background: rgba(79,142,247,.2); color: var(--accent); }
+  .p2 .step-num { background: rgba(124,106,245,.2); color: var(--accent2); }
+  .p3 .step-num { background: rgba(79,190,150,.2); color: var(--green); }
+
+  .section-header h3 { font-size: 15px; font-weight: 600; }
+
+  .section-body { padding: 20px; }
+
+  /* Sub-steps */
+  .substep {
+    margin-bottom: 20px;
+    padding-bottom: 20px;
+    border-bottom: 1px solid var(--border);
+  }
+  .substep:last-child { margin-bottom: 0; padding-bottom: 0; border-bottom: none; }
+
+  .substep-label {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 12px;
+    font-weight: 700;
+    font-family: 'JetBrains Mono', monospace;
+    color: var(--text-muted);
+    margin-bottom: 8px;
+    background: var(--code-bg);
+    padding: 3px 10px;
+    border-radius: 5px;
+  }
+
+  .substep p { font-size: 14px; line-height: 1.75; margin-bottom: 10px; }
+  .substep p:last-child { margin-bottom: 0; }
+
+  /* Screenshots */
+  .screenshot {
+    margin: 12px 0;
+    border-radius: 8px;
+    overflow: hidden;
+    border: 1px solid var(--border);
+  }
+  .screenshot img {
+    display: block;
+    width: 100%;
+    height: auto;
+    background: #fff;
+  }
+
+  /* Code blocks */
+  pre {
+    background: var(--code-bg);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 16px;
+    overflow-x: auto;
+    margin: 10px 0;
+  }
+  code {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 13px;
+    color: #a8d8a0;
+    line-height: 1.6;
+  }
+  p code, li code {
+    background: var(--code-bg);
+    padding: 2px 6px;
+    border-radius: 4px;
+    font-size: 12.5px;
+    color: var(--orange);
+  }
+
+  /* Table */
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 13.5px;
+    margin: 10px 0;
+  }
+  th {
+    background: var(--surface2);
+    color: var(--text-muted);
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: .05em;
+    font-weight: 600;
+    padding: 10px 14px;
+    text-align: left;
+    border: 1px solid var(--border);
+  }
+  td {
+    padding: 9px 14px;
+    border: 1px solid var(--border);
+    vertical-align: top;
+  }
+  td code { font-size: 12px; }
+
+  /* Notice box */
+  .notice {
+    background: rgba(247,137,79,.07);
+    border: 1px solid rgba(247,137,79,.3);
+    border-radius: 8px;
+    padding: 12px 16px;
+    font-size: 13.5px;
+    margin: 10px 0;
+    color: #f7c49f;
+  }
+  .notice strong { color: var(--orange); }
+
+  /* Prereqs */
+  .prereq-box {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 14px 18px;
+    margin-bottom: 24px;
+  }
+  .prereq-box h4 { font-size: 12px; text-transform: uppercase; letter-spacing: .08em; color: var(--text-muted); margin-bottom: 10px; }
+  .prereq-box ul { list-style: none; }
+  .prereq-box li { font-size: 13.5px; padding: 4px 0; padding-left: 18px; position: relative; }
+  .prereq-box li::before { content: '✓'; position: absolute; left: 0; color: var(--green); font-size: 12px; }
+
+  /* Part divider */
+  .part-divider {
+    height: 1px;
+    background: linear-gradient(90deg, transparent, var(--border), transparent);
+    margin: 40px 0;
+  }
+
+  /* Footer */
+  footer {
+    border-top: 1px solid var(--border);
+    padding: 24px;
+    text-align: center;
+    font-size: 12px;
+    color: var(--text-dim);
+  }
+  footer a { color: var(--accent); text-decoration: none; }
+
+  @media (max-width: 768px) {
+    .layout { flex-direction: column; }
+    .toc { width: 100%; }
+    .toc-inner { position: static; }
+  }
+</style>
+</head>
+<body>
+
+<!-- ═══════════ HEADER ═══════════ -->
+<header class="site-header">
+  <div class="badge">SSO セットアップガイド</div>
+  <h1>AWS アカウントに <span>Google Workspace</span> ユーザーで<br>シングルサインオン</h1>
+  <div class="subtitle">IAM Identity Center × SAML × SCIM 自動プロビジョニング — 全3パート統合版</div>
+  <a class="source-link" href="https://techblog.ap-com.co.jp/entry/2024/02/22/013219" target="_blank">
+    📄 元記事: APC 技術ブログ
+  </a>
+</header>
+
+<!-- ═══════════ LAYOUT ═══════════ -->
+<div class="layout">
+
+  <!-- TOC -->
+  <nav class="toc">
+    <div class="toc-inner">
+      <div class="toc-title">目次</div>
+
+      <div class="toc-part">
+        <div class="toc-part-label p1">Part 1</div>
+        <a href="#step1">1. カスタムユーザー属性を作成</a>
+        <a href="#step2">2. IdP メタデータをダウンロード</a>
+        <a href="#step3">3. Google Workspace で AWS アプリ設定</a>
+        <a href="#step4">4. IAM Identity Center の ID ソース変更</a>
+      </div>
+
+      <div class="toc-part">
+        <div class="toc-part-label p2">Part 2</div>
+        <a href="#step5">5. Google Workspace でアプリを有効化</a>
+        <a href="#step6">6. IAM Identity Center 自動プロビジョニング設定</a>
+        <a href="#step7">7. Google Workspace で自動プロビジョニング設定</a>
+      </div>
+
+      <div class="toc-part">
+        <div class="toc-part-label p3">Part 3</div>
+        <a href="#step8">8. IAM Identity Center グループを作成</a>
+        <a href="#step9">9. ユーザーをグループに追加</a>
+        <a href="#step10">10. グループにアクセス権を付与</a>
+        <a href="#step11">11. アクセスを確認</a>
+      </div>
+    </div>
+  </nav>
+
+  <!-- CONTENT -->
+  <main class="content">
+
+    <!-- ══ PART 1 ══ -->
+    <div class="part-banner p1">
+      <div class="part-num">01</div>
+      <div class="part-info">
+        <h2>SAML 連携の基本設定</h2>
+        <p>Google Workspace と IAM Identity Center の信頼関係を構築する</p>
+      </div>
+    </div>
+
+    <div class="prereq-box">
+      <h4>前提条件</h4>
+      <ul>
+        <li>AWS アカウントで IAM Identity Center が有効になっていること</li>
+        <li>Google Workspace 特権管理者権限を持つアカウントにサインインできること</li>
+        <li>すべての Google Workspace ユーザーに [名][姓][ユーザー名][表示名] が設定されていること</li>
+        <li>各ユーザーのメールアドレス等の属性が1つのみ設定されていること</li>
+      </ul>
+    </div>
+
+    <!-- Step 1 -->
+    <div class="section p1" id="step1">
+      <div class="section-header p1">
+        <div class="step-num p1">1</div>
+        <h3>AWS のカスタムユーザー属性を作成する</h3>
+      </div>
+      <div class="section-body">
+
+        <div class="substep">
+          <div class="substep-label">1-1</div>
+          <p>特権管理者権限を持つアカウントを使用して <strong>Google 管理コンソール</strong> にサインインします。</p>
+        </div>
+
+        <div class="substep">
+          <div class="substep-label">1-2</div>
+          <p>左側のナビゲーションパネルで <strong>[ディレクトリ]</strong> → <strong>[ユーザー]</strong> を選択します。</p>
+        </div>
+
+        <div class="substep">
+          <div class="substep-label">1-3</div>
+          <p>[ユーザー] リスト上部の <strong>[その他のオプション]</strong> → <strong>[カスタム属性を管理します]</strong> を選択します。</p>
+          <div class="screenshot"><img src="https://cdn-ak.f.st-hatena.com/images/fotolife/s/sk07103/20240221/20240221233828.png" alt="カスタム属性管理" loading="lazy"></div>
+        </div>
+
+        <div class="substep">
+          <div class="substep-label">1-4</div>
+          <p>ページ右上の <strong>[カスタム属性を追加]</strong> を選択します。</p>
+          <div class="screenshot"><img src="https://cdn-ak.f.st-hatena.com/images/fotolife/s/sk07103/20240221/20240221233855.png" alt="カスタム属性を追加" loading="lazy"></div>
+        </div>
+
+        <div class="substep">
+          <div class="substep-label">1-5</div>
+          <p>以下の値を入力し <strong>[保存]</strong> を選択します。</p>
+          <table>
+            <tr><th>項目</th><th>値</th></tr>
+            <tr><td>カテゴリ</td><td><code>Amazon</code></td></tr>
+            <tr><td>説明</td><td><code>Amazon Custom Attributes</code></td></tr>
+            <tr><td>カスタムフィールド名</td><td><code>Role</code></td></tr>
+            <tr><td>情報の種類</td><td>テキスト</td></tr>
+            <tr><td>表示設定</td><td>ユーザーと管理者に表示</td></tr>
+            <tr><td>値の数</td><td>複数の値</td></tr>
+          </table>
+          <div class="screenshot"><img src="https://cdn-ak.f.st-hatena.com/images/fotolife/s/sk07103/20240221/20240221233910.png" alt="カスタムフィールド設定" loading="lazy"></div>
+        </div>
+
+      </div>
+    </div>
+
+    <!-- Step 2 -->
+    <div class="section p1" id="step2">
+      <div class="section-header p1">
+        <div class="step-num p1">2</div>
+        <h3>ID プロバイダーのメタデータをダウンロードする</h3>
+      </div>
+      <div class="section-body">
+        <div class="substep">
+          <div class="substep-label">2-1</div>
+          <p>Google 管理コンソールの左ナビで <strong>[セキュリティ]</strong> → <strong>[認証]</strong> → <strong>[SAML アプリケーションによる SSO]</strong> を選択します。</p>
+        </div>
+        <div class="substep">
+          <div class="substep-label">2-2</div>
+          <p><strong>[IdP メタデータ]</strong> の <strong>[メタデータをダウンロード]</strong> を選択します。<code>GoogleIDPMetadata.xml</code> がダウンロードされます。</p>
+          <div class="screenshot"><img src="https://cdn-ak.f.st-hatena.com/images/fotolife/s/sk07103/20240221/20240221234700.png" alt="メタデータダウンロード" loading="lazy"></div>
+          <div class="notice"><strong>⚠ メモ:</strong> Google 管理コンソールは以降の手順でも使用するため、開いたままにしてください。</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Step 3 -->
+    <div class="section p1" id="step3">
+      <div class="section-header p1">
+        <div class="step-num p1">3</div>
+        <h3>Google Workspace で Amazon Web Services アプリをセットアップする</h3>
+      </div>
+      <div class="section-body">
+        <div class="substep">
+          <div class="substep-label">3-1 〜 3-3</div>
+          <p>Google 管理コンソールの <strong>[アプリ]</strong> → <strong>[ウェブアプリとモバイルアプリ]</strong> → <strong>[アプリを追加]</strong> → <strong>[アプリを検索]</strong> で「Amazon Web Services」を検索・選択します。</p>
+          <div class="screenshot"><img src="https://cdn-ak.f.st-hatena.com/images/fotolife/s/sk07103/20240221/20240221234838.png" alt="アプリを追加" loading="lazy"></div>
+          <div class="screenshot"><img src="https://cdn-ak.f.st-hatena.com/images/fotolife/s/sk07103/20240221/20240221234857.png" alt="Amazon Web Services を選択" loading="lazy"></div>
+        </div>
+        <div class="substep">
+          <div class="substep-label">3-4 〜 3-5</div>
+          <p><strong>[続行]</strong> を選択し、ACS URL とエンティティ ID がデフォルト設定されていることを確認して <strong>[続行]</strong> します。</p>
+          <div class="screenshot"><img src="https://cdn-ak.f.st-hatena.com/images/fotolife/s/sk07103/20240221/20240221234915.png" alt="Google IdP 詳細" loading="lazy"></div>
+          <div class="screenshot"><img src="https://cdn-ak.f.st-hatena.com/images/fotolife/s/sk07103/20240222/20240222004250.png" alt="サービスプロバイダ詳細" loading="lazy"></div>
+        </div>
+        <div class="substep">
+          <div class="substep-label">3-6 〜 3-7</div>
+          <p><strong>[属性のマッピング]</strong> ページで以下の2つをマッピングし <strong>[完了]</strong> を選択します。</p>
+          <table>
+            <tr><th>Google ディレクトリ属性</th><th>アプリの属性</th></tr>
+            <tr><td>Basic Information &gt; Primary Email</td><td><code>https://aws.amazon.com/SAML/Attributes/RoleSessionName</code></td></tr>
+            <tr><td>Amazon &gt; Role</td><td><code>https://aws.amazon.com/SAML/Attributes/Role</code></td></tr>
+          </table>
+          <div class="screenshot"><img src="https://cdn-ak.f.st-hatena.com/images/fotolife/s/sk07103/20240222/20240222004359.png" alt="属性マッピング" loading="lazy"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Step 4 -->
+    <div class="section p1" id="step4">
+      <div class="section-header p1">
+        <div class="step-num p1">4</div>
+        <h3>IAM Identity Center の ID ソースを変更し、Google Workspace を SAML IdP として設定する</h3>
+      </div>
+      <div class="section-body">
+        <div class="substep">
+          <div class="substep-label">4-1 〜 4-4</div>
+          <p>IAM Identity Center コンソールの <strong>[設定]</strong> → <strong>[アクション]</strong> → <strong>[アイデンティティソースを変更]</strong> → <strong>[外部 ID プロバイダー]</strong> を選択し <strong>[次へ]</strong> を押します。</p>
+          <div class="screenshot"><img src="https://cdn-ak.f.st-hatena.com/images/fotolife/s/sk07103/20240222/20240222004422.png" alt="設定ページ" loading="lazy"></div>
+          <div class="screenshot"><img src="https://cdn-ak.f.st-hatena.com/images/fotolife/s/sk07103/20240222/20240222004440.png" alt="外部IDプロバイダーを選択" loading="lazy"></div>
+        </div>
+        <div class="substep">
+          <div class="substep-label">4-5</div>
+          <p>Google 管理コンソールで <strong>[アプリ]</strong> → <strong>[ウェブアプリとモバイルアプリ]</strong> → <strong>[カスタム SAML アプリの追加]</strong> を選択します。</p>
+          <div class="screenshot"><img src="https://cdn-ak.f.st-hatena.com/images/fotolife/s/sk07103/20240222/20240222004500.png" alt="カスタムSAMLアプリ追加" loading="lazy"></div>
+          <p>アプリ名に <code>AWS access portal</code> を入力して <strong>[続行]</strong> します。</p>
+          <div class="screenshot"><img src="https://cdn-ak.f.st-hatena.com/images/fotolife/s/sk07103/20240222/20240222004518.png" alt="アプリ詳細" loading="lazy"></div>
+          <p>IAM Identity Center コンソールの <strong>[サービスプロバイダーのメタデータ]</strong> から <strong>ACS URL</strong> と <strong>発行者 URL</strong> をコピーし、Google 管理コンソールの対応フィールドに貼り付けます。</p>
+          <div class="screenshot"><img src="https://cdn-ak.f.st-hatena.com/images/fotolife/s/sk07103/20240222/20240222004544.png" alt="ACS URLとエンティティID" loading="lazy"></div>
+          <div class="screenshot"><img src="https://cdn-ak.f.st-hatena.com/images/fotolife/s/sk07103/20240222/20240222004600.png" alt="サービスプロバイダ詳細入力" loading="lazy"></div>
+          <p>名前 ID の設定は以下の通りにします。</p>
+          <table>
+            <tr><th>項目</th><th>値</th></tr>
+            <tr><td>名前 ID 形式</td><td>EMAIL</td></tr>
+            <tr><td>名前 ID</td><td>Basic Information &gt; Primary email</td></tr>
+          </table>
+          <div class="screenshot"><img src="https://cdn-ak.f.st-hatena.com/images/fotolife/s/sk07103/20240222/20240222004618.png" alt="名前ID設定" loading="lazy"></div>
+          <p>属性マッピングを Step 3 と同様に設定して <strong>[完了]</strong> します。</p>
+          <div class="screenshot"><img src="https://cdn-ak.f.st-hatena.com/images/fotolife/s/sk07103/20240222/20240222005106.png" alt="属性マッピング完了" loading="lazy"></div>
+        </div>
+        <div class="substep">
+          <div class="substep-label">4-6 〜 4-7</div>
+          <p>IAM Identity Center コンソールに戻り、手順 2 でダウンロードした <code>GoogleIDPMetadata.xml</code> をアップロードして <strong>[次へ]</strong> を押します。</p>
+          <div class="screenshot"><img src="https://cdn-ak.f.st-hatena.com/images/fotolife/s/sk07103/20240222/20240222005248.png" alt="メタデータアップロード" loading="lazy"></div>
+          <p>確認ページで「<strong>承諾</strong>」と入力し <strong>[アイデンティティソースを変更]</strong> を選択します。</p>
+          <div class="screenshot"><img src="https://cdn-ak.f.st-hatena.com/images/fotolife/s/sk07103/20240222/20240222005304.png" alt="変更の確認" loading="lazy"></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="part-divider"></div>
+
+    <!-- ══ PART 2 ══ -->
+    <div class="part-banner p2">
+      <div class="part-num">02</div>
+      <div class="part-info">
+        <h2>アプリ有効化と自動プロビジョニング</h2>
+        <p>SCIM を使って Google Workspace ユーザーを自動同期する</p>
+      </div>
+    </div>
+
+    <div class="prereq-box">
+      <h4>前提条件</h4>
+      <ul>
+        <li>Part 1 の手順がすべて完了していること</li>
+      </ul>
+    </div>
+
+    <!-- Step 5 -->
+    <div class="section p2" id="step5">
+      <div class="section-header p2">
+        <div class="step-num p2">5</div>
+        <h3>Google Workspace でアプリを有効にする</h3>
+      </div>
+      <div class="section-body">
+        <div class="substep">
+          <div class="substep-label">5-1 〜 5-4</div>
+          <p>Google 管理コンソールの <strong>[アプリ]</strong> → <strong>[ウェブアプリとモバイルアプリ]</strong> から <strong>Amazon Web Services</strong> を選択します。</p>
+          <div class="screenshot"><img src="https://cdn-ak.f.st-hatena.com/images/fotolife/s/sk07103/20240226/20240226233955.png" alt="Amazon Web Servicesアプリ" loading="lazy"></div>
+          <p><strong>[ユーザーアクセス]</strong> パネルを展開し、サービスのステータスを <strong>[オン (すべてのユーザー)]</strong> に設定して <strong>[保存]</strong> します。</p>
+          <div class="screenshot"><img src="https://cdn-ak.f.st-hatena.com/images/fotolife/s/sk07103/20240226/20240226234629.png" alt="ユーザーアクセスパネル" loading="lazy"></div>
+          <div class="screenshot"><img src="https://cdn-ak.f.st-hatena.com/images/fotolife/s/sk07103/20240226/20240226234648.png" alt="オン(すべてのユーザー)に設定" loading="lazy"></div>
+        </div>
+        <div class="substep">
+          <div class="substep-label">5-5 〜 5-7</div>
+          <p>同様に <strong>AWS access portal</strong> アプリも選択し、サービスのステータスを <strong>[オン (すべてのユーザー)]</strong> に設定して <strong>[保存]</strong> します。</p>
+          <div class="screenshot"><img src="https://cdn-ak.f.st-hatena.com/images/fotolife/s/sk07103/20240226/20240226234659.png" alt="AWS access portal" loading="lazy"></div>
+          <div class="screenshot"><img src="https://cdn-ak.f.st-hatena.com/images/fotolife/s/sk07103/20240226/20240226234714.png" alt="AWS access portal を有効化" loading="lazy"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Step 6 -->
+    <div class="section p2" id="step6">
+      <div class="section-header p2">
+        <div class="step-num p2">6</div>
+        <h3>IAM Identity Center 自動プロビジョニングをセットアップする</h3>
+      </div>
+      <div class="section-body">
+        <div class="substep">
+          <div class="substep-label">6-1 〜 6-2</div>
+          <p>IAM Identity Center コンソールの <strong>[設定]</strong> ページで <strong>[自動プロビジョニング情報]</strong> ボックスの <strong>[有効にする]</strong> を選択します。</p>
+          <div class="screenshot"><img src="https://cdn-ak.f.st-hatena.com/images/fotolife/s/sk07103/20240226/20240226234730.png" alt="自動プロビジョニングを有効化" loading="lazy"></div>
+        </div>
+        <div class="substep">
+          <div class="substep-label">6-3 〜 6-4</div>
+          <p><strong>[インバウンド自動プロビジョニング]</strong> ダイアログで以下の値をコピーして控えます（次のステップで使用）。</p>
+          <table>
+            <tr><th>コピーする値</th></tr>
+            <tr><td>SCIM エンドポイント</td></tr>
+            <tr><td>アクセストークン</td></tr>
+          </table>
+          <div class="screenshot"><img src="https://cdn-ak.f.st-hatena.com/images/fotolife/s/sk07103/20240226/20240226234745.png" alt="SCIMエンドポイントとアクセストークン" loading="lazy"></div>
+          <p><strong>[閉じる]</strong> を選択します。</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- Step 7 -->
+    <div class="section p2" id="step7">
+      <div class="section-header p2">
+        <div class="step-num p2">7</div>
+        <h3>Google Workspace で自動プロビジョニングを構成する</h3>
+      </div>
+      <div class="section-body">
+        <div class="substep">
+          <div class="substep-label">7-1 〜 7-3</div>
+          <p>Google 管理コンソールの <strong>[アプリ]</strong> → <strong>[ウェブアプリとモバイルアプリ]</strong> から <strong>Amazon Web Services</strong> を選択し、<strong>[自動プロビジョニングを設定]</strong> をクリックします。</p>
+          <div class="screenshot"><img src="https://cdn-ak.f.st-hatena.com/images/fotolife/s/sk07103/20240226/20240226234759.png" alt="Amazon Web Services選択" loading="lazy"></div>
+          <div class="screenshot"><img src="https://cdn-ak.f.st-hatena.com/images/fotolife/s/sk07103/20240226/20240226234823.png" alt="自動プロビジョニングを設定" loading="lazy"></div>
+        </div>
+        <div class="substep">
+          <div class="substep-label">7-4 〜 7-5</div>
+          <p>手順 6-3 でコピーした <strong>アクセストークン</strong> と <strong>SCIM エンドポイント URL</strong>（末尾のスラッシュを削除）を入力し <strong>[続行]</strong> します。</p>
+          <div class="screenshot"><img src="https://cdn-ak.f.st-hatena.com/images/fotolife/s/sk07103/20240226/20240226234834.png" alt="アクセストークン入力" loading="lazy"></div>
+          <div class="screenshot"><img src="https://cdn-ak.f.st-hatena.com/images/fotolife/s/sk07103/20240226/20240226234844.png" alt="SCIMエンドポイント入力" loading="lazy"></div>
+        </div>
+        <div class="substep">
+          <div class="substep-label">7-6 〜 7-8</div>
+          <p>必須の IAM Identity Center 属性がすべて Google Cloud Directory 属性にマッピングされていることを確認し <strong>[続行]</strong> → グループ選択はスキップして <strong>[続行]</strong> → <strong>[完了]</strong> を選択します。</p>
+          <div class="screenshot"><img src="https://cdn-ak.f.st-hatena.com/images/fotolife/s/sk07103/20240226/20240226234859.png" alt="属性マッピング確認" loading="lazy"></div>
+          <div class="screenshot"><img src="https://cdn-ak.f.st-hatena.com/images/fotolife/s/sk07103/20240227/20240227000134.png" alt="グループ選択" loading="lazy"></div>
+          <div class="screenshot"><img src="https://cdn-ak.f.st-hatena.com/images/fotolife/s/sk07103/20240226/20240226234929.png" alt="プロビジョニング解除設定" loading="lazy"></div>
+        </div>
+        <div class="substep">
+          <div class="substep-label">7-9 〜 7-11</div>
+          <p><strong>[自動プロビジョニング]</strong> セクションのトグルを <strong>[有効]</strong> に変更し、確認ダイアログで <strong>[有効にする]</strong> を選択します。</p>
+          <div class="screenshot"><img src="https://cdn-ak.f.st-hatena.com/images/fotolife/s/sk07103/20240226/20240226235332.png" alt="自動プロビジョニング有効化" loading="lazy"></div>
+          <div class="screenshot"><img src="https://cdn-ak.f.st-hatena.com/images/fotolife/s/sk07103/20240226/20240226235346.png" alt="有効にする確認ダイアログ" loading="lazy"></div>
+          <p>IAM Identity Center コンソールの <strong>[ユーザー]</strong> に Google Workspace ユーザーが同期されていることを確認します。</p>
+          <div class="notice"><strong>⚠ 注意:</strong> ユーザー同期には最大24時間かかる場合がありますが、ほとんどの場合は数分以内に完了します。</div>
+          <div class="screenshot"><img src="https://cdn-ak.f.st-hatena.com/images/fotolife/s/sk07103/20240226/20240226235403.png" alt="ユーザー同期確認" loading="lazy"></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="part-divider"></div>
+
+    <!-- ══ PART 3 ══ -->
+    <div class="part-banner p3">
+      <div class="part-num">03</div>
+      <div class="part-info">
+        <h2>グループ管理とアクセス権付与</h2>
+        <p>IAM Identity Center グループを作成し、AWS アカウントへのアクセスを設定する</p>
+      </div>
+    </div>
+
+    <div class="prereq-box">
+      <h4>前提条件</h4>
+      <ul>
+        <li>Part 1・Part 2 の手順がすべて完了していること</li>
+      </ul>
+    </div>
+
+    <!-- Step 8 -->
+    <div class="section p3" id="step8">
+      <div class="section-header p3">
+        <div class="step-num p3">8</div>
+        <h3>IAM Identity Center グループを作成する</h3>
+      </div>
+      <div class="section-body">
+        <div class="substep">
+          <div class="substep-label">8-1</div>
+          <p>IAM Identity Center コンソールの <strong>[設定]</strong> → <strong>[アイデンティティソース]</strong> で <strong>[IDストアID]</strong> を確認してメモします。</p>
+          <div class="screenshot"><img src="https://cdn-ak.f.st-hatena.com/images/fotolife/s/sk07103/20240324/20240324210329.png" alt="IDストアIDの確認" loading="lazy"></div>
+        </div>
+        <div class="substep">
+          <div class="substep-label">8-2</div>
+          <p>IAM Identity Center の自動プロビジョニングを有効化すると、コンソールからグループ操作ができなくなるため <strong>AWS CLI</strong>（本記事では CloudShell）を使用します。</p>
+          <div class="notice"><strong>💡 ポイント:</strong> IAM Identity Center が有効化されているリージョンで CloudShell アイコンを選択してください。</div>
+          <div class="screenshot"><img src="https://cdn-ak.f.st-hatena.com/images/fotolife/s/sk07103/20240324/20240324210343.png" alt="CloudShellを開く" loading="lazy"></div>
+        </div>
+        <div class="substep">
+          <div class="substep-label">8-3 〜 8-4</div>
+          <p>以下のコマンドを実行してグループを作成します（例: <code>google-test-administrator</code>）。出力された <strong>GroupId</strong> を控えてください。</p>
+<pre><code>$ aws identitystore create-group \
+  --identity-store-id &lt;手順8-1のIDストアID&gt; \
+  --display-name google-test-administrator
+
+# 実行結果
+{
+    "GroupId": "xxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx",
+    "IdentityStoreId": "&lt;IDストアID&gt;"
+}</code></pre>
+        </div>
+      </div>
+    </div>
+
+    <!-- Step 9 -->
+    <div class="section p3" id="step9">
+      <div class="section-header p3">
+        <div class="step-num p3">9</div>
+        <h3>Google Workspace ユーザーを IAM Identity Center グループに追加する</h3>
+      </div>
+      <div class="section-body">
+        <div class="substep">
+          <div class="substep-label">9-1 〜 9-2</div>
+          <p>IAM Identity Center コンソールの <strong>[ユーザー]</strong> から対象ユーザーを選択し、<strong>[一般的な情報]</strong> の <strong>[ユーザーID]</strong> を確認してメモします。</p>
+          <div class="screenshot"><img src="https://cdn-ak.f.st-hatena.com/images/fotolife/s/sk07103/20240324/20240324210357.png" alt="ユーザー一覧" loading="lazy"></div>
+          <div class="screenshot"><img src="https://cdn-ak.f.st-hatena.com/images/fotolife/s/sk07103/20240324/20240324210408.png" alt="ユーザーIDの確認" loading="lazy"></div>
+        </div>
+        <div class="substep">
+          <div class="substep-label">9-3</div>
+          <p>以下のコマンドを実行してユーザーをグループに追加します。</p>
+<pre><code>$ aws identitystore create-group-membership \
+  --identity-store-id &lt;手順8-1のIDストアID&gt; \
+  --group-id &lt;手順8-4のGroupId&gt; \
+  --member-id UserId=&lt;手順9-2のユーザーID&gt;
+
+# 実行結果
+{
+    "MembershipId": "xxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx",
+    "IdentityStoreId": "&lt;IDストアID&gt;"
+}</code></pre>
+        </div>
+      </div>
+    </div>
+
+    <!-- Step 10 -->
+    <div class="section p3" id="step10">
+      <div class="section-header p3">
+        <div class="step-num p3">10</div>
+        <h3>IAM Identity Center グループに AWS アカウントへのアクセス権を付与する</h3>
+      </div>
+      <div class="section-body">
+        <div class="substep">
+          <div class="substep-label">10-1 〜 10-5</div>
+          <p>IAM Identity Center コンソールの <strong>[AWS アカウント]</strong> から対象アカウントにチェックを入れ、<strong>[ユーザーまたはグループを割り当て]</strong> を選択します。</p>
+          <div class="screenshot"><img src="https://cdn-ak.f.st-hatena.com/images/fotolife/s/sk07103/20240324/20240324210422.png" alt="AWSアカウントを選択" loading="lazy"></div>
+          <p><strong>[グループ]</strong> タブで作成した <code>google-test-administrator</code> を選択して <strong>[次へ]</strong> します。</p>
+          <div class="screenshot"><img src="https://cdn-ak.f.st-hatena.com/images/fotolife/s/sk07103/20240324/20240324210433.png" alt="グループを選択" loading="lazy"></div>
+          <p>割り当てる許可セットを選択して <strong>[次へ]</strong> → 内容を確認して <strong>[送信]</strong> します。</p>
+          <div class="screenshot"><img src="https://cdn-ak.f.st-hatena.com/images/fotolife/s/sk07103/20240324/20240324210442.png" alt="許可セットを選択" loading="lazy"></div>
+          <div class="screenshot"><img src="https://cdn-ak.f.st-hatena.com/images/fotolife/s/sk07103/20240324/20240324210453.png" alt="確認して送信" loading="lazy"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Step 11 -->
+    <div class="section p3" id="step11">
+      <div class="section-header p3">
+        <div class="step-num p3">11</div>
+        <h3>Google Workspace ユーザーの AWS リソースへのアクセスを確認する</h3>
+      </div>
+      <div class="section-body">
+        <div class="substep">
+          <div class="substep-label">11-1 〜 11-4</div>
+          <p>アクセス許可を設定した Google Workspace ユーザーで <strong>AWS アクセスポータルアプリ</strong> を開きます。</p>
+          <p>許可した AWS アカウントが表示されることを確認します。</p>
+          <div class="screenshot"><img src="https://cdn-ak.f.st-hatena.com/images/fotolife/s/sk07103/20240324/20240324210503.png" alt="AWSアカウントが表示される" loading="lazy"></div>
+          <p>アカウントを選択し、手順 10-4 で選択した許可セット名が表示されることを確認します。</p>
+          <div class="screenshot"><img src="https://cdn-ak.f.st-hatena.com/images/fotolife/s/sk07103/20240324/20240324210512.png" alt="許可セット名が表示される" loading="lazy"></div>
+          <p><strong>[Management console]</strong> を選択し、AWS コンソールにアクセスできることを確認します。</p>
+          <div class="screenshot"><img src="https://cdn-ak.f.st-hatena.com/images/fotolife/s/sk07103/20240324/20240324210526.png" alt="Management consoleを選択" loading="lazy"></div>
+          <div class="screenshot"><img src="https://cdn-ak.f.st-hatena.com/images/fotolife/s/sk07103/20240324/20240324210533.png" alt="AWSコンソールにアクセス完了" loading="lazy"></div>
+          <div class="notice" style="background:rgba(79,190,150,.07);border-color:rgba(79,190,150,.3);color:#a8f0d0;">
+            <strong>✅ 完了:</strong> Google Workspace ユーザーが IAM Identity Center 経由で AWS コンソールにサインインできるようになりました！
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </main>
+</div>
+
+<footer>
+  元記事: <a href="https://techblog.ap-com.co.jp/entry/2024/02/22/013219" target="_blank">APC 技術ブログ (Part 1)</a> ·
+  <a href="https://techblog.ap-com.co.jp/entry/2024/02/27/001144" target="_blank">Part 2</a> ·
+  <a href="https://techblog.ap-com.co.jp/entry/2024/03/25/120348" target="_blank">Part 3</a>
+  &nbsp;|&nbsp; by sk07103 (エーピーコミュニケーションズ)
+</footer>
+
+</body>
+</html>
